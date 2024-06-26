@@ -1,0 +1,19 @@
+version: "3"
+
+dotenv:
+  [
+    ".env",
+    "{{.ENV}}/.env.",
+    "{{.HOME}}/.env",
+    "/apps/data/env/taskfile.env",
+    ".local/env/taskfile.env",
+  ]
+
+includes:
+  build:
+    taskfile: taskfile/build.yaml
+    optional: true
+
+  test:
+    taskfile: taskfile/test.yaml
+    optional: true

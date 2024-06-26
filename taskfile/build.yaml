@@ -1,0 +1,62 @@
+version: "3"
+
+vars:
+  APP_NAME: app
+  Developer: https://yuque.com/lwmacct
+  Git_Tag_Latest:
+    sh: |
+      latest_tag=$(git describe --tags --abbrev=0 2>/dev/null) || echo "v0.0.0"
+      if [ "${latest_tag}" == "v0.0.0" ]; then git tag v0.0.0;latest_tag="v0.0.0"; fi
+      echo -n ${latest_tag}
+  Git_Tag_Next:
+    sh: |
+      # 将 Git_Tag_Latest 用 . 分割取最后一位 patch 版本号，加 1
+      echo {{.Git_Tag_Latest}} | awk -F. '{print $1"."$2"."$3+1}'
+
+  Git_Commit:
+    sh: git log -n 1 --format=%h 2>/dev/null || echo "0000"
+
+  Build_Time:
+    sh: TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z'
+
+  Build_Bin: build/bin
+  Build_Dir: build
+
+  LDFLAGS: >-
+    -s
+    -w
+    -X 'main.version={{.Git_Tag_Next}}' 
+    -X 'main.commit={{.Git_Commit}}' 
+    -X 'main.buildTime={{.Build_Time}}'
+    -X 'main.developer={{.Developer}}'
+
+tasks:
+  sss:
+    desc: Run the tests
+    cmds:
+      - echo "{{.Git_Tag_Next}}"
+
+  build:
+    desc: Build the project
+    cmds:
+      - go build -ldflags "{{.LDFLAGS}}" -o "{{.Build_Bin}}/{{.APP_NAME}}" ./cmd/{{.APP_NAME}}
+
+  clean:
+    desc: Clean the project
+    cmds:
+      - rm -rf "{{.Build_Dir}}"
+
+  run:
+    desc: Run the project
+    cmds:
+      - go run -ldflags "{{.LDFLAGS}}" ./cmd/{{.APP_NAME}}
+
+  test:
+    desc: Run the tests
+    cmds:
+      - go test -v ./...
+
+  release:
+    desc: Release the project
+    cmds:
+      - echo "Release the project"
