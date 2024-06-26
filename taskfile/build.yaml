@@ -1,34 +1,34 @@
 version: "3"
 
 vars:
-  APP_NAME: app
   Developer: https://yuque.com/lwmacct
+  App_Name: app
+  Bin_Dir: ".local/bin"
   Git_Tag_Latest:
     sh: |
-      latest_tag=$(git describe --tags --abbrev=0 2>/dev/null) || echo "v0.0.0"
-      if [ "${latest_tag}" == "v0.0.0" ]; then git tag v0.0.0;latest_tag="v0.0.0"; fi
-      echo -n ${latest_tag}
+      latest_tag=$(git describe --tags --abbrev=0 2>/dev/null) || true
+      if [[ "${latest_tag}" == "" ]]; then
+          git tag v0.0.0 -m "init" 
+          latest_tag="v0.0.0";
+      fi
+      echo ${latest_tag}
   Git_Tag_Next:
     sh: |
       # 将 Git_Tag_Latest 用 . 分割取最后一位 patch 版本号，加 1
       echo {{.Git_Tag_Latest}} | awk -F. '{print $1"."$2"."$3+1}'
-
   Git_Commit:
     sh: git log -n 1 --format=%h 2>/dev/null || echo "0000"
 
   Build_Time:
     sh: TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z'
 
-  Build_Bin: build/bin
-  Build_Dir: build
-
   LDFLAGS: >-
-    -s
-    -w
     -X 'main.version={{.Git_Tag_Next}}' 
     -X 'main.commit={{.Git_Commit}}' 
     -X 'main.buildTime={{.Build_Time}}'
     -X 'main.developer={{.Developer}}'
+    -s 
+    -w
 
 tasks:
   sss:
@@ -37,26 +37,26 @@ tasks:
       - echo "{{.Git_Tag_Next}}"
 
   build:
-    desc: Build the project
-    cmds:
-      - go build -ldflags "{{.LDFLAGS}}" -o "{{.Build_Bin}}/{{.APP_NAME}}" ./cmd/{{.APP_NAME}}
-
-  clean:
-    desc: Clean the project
-    cmds:
-      - rm -rf "{{.Build_Dir}}"
-
-  run:
-    desc: Run the project
-    cmds:
-      - go run -ldflags "{{.LDFLAGS}}" ./cmd/{{.APP_NAME}}
-
-  test:
-    desc: Run the tests
-    cmds:
-      - go test -v ./...
+    desc: 构建所有架构
+    deps:
+      - task: arch:x86_64
 
   release:
     desc: Release the project
     cmds:
       - echo "Release the project"
+
+  arch:x86_64:
+    desc: Build the project for x86_64
+    vars:
+      ARCH: "x86_64"
+    cmds:
+      - |
+        echo "构建项目: {{.App_Name}}-{{.Git_Tag_Next}}-{{.ARCH}}"
+        CGO_ENABLED=0
+        GOOS=linux
+        GOARCH=amd64
+
+        mkdir -p {{.Bin_Dir}}
+        go build -ldflags "{{.LDFLAGS}}" -a -installsuffix cgo -o {{.Bin_Dir}}/{{.App_Name}}-{{.Git_Tag_Next}}-{{.ARCH}} ./cmd/app
+        upx -9 -q {{.Bin_Dir}}/{{.App_Name}}-{{.Git_Tag_Next}}-{{.ARCH}}
