@@ -3,7 +3,9 @@ version: "3"
 vars:
   Developer: https://yuque.com/lwmacct
   App_Name: app
+  Project: tmp
   Bin_Dir: ".local/bin"
+  Archive: ".local/archive"
   Git_Tag_Latest:
     sh: |
       latest_tag=$(git describe --tags --abbrev=0 2>/dev/null) || true
@@ -39,12 +41,31 @@ tasks:
   build:
     desc: 构建所有架构
     deps:
+      - task: pre
       - task: arch:x86_64
+      - task: arch:armv7
+      - task: arch:aarch64
+    cmds:
+      - echo "开始同步构建结果"
+      - task: rsync
+      - echo "构建完成"
 
   release:
     desc: Release the project
     cmds:
       - echo "Release the project"
+
+  pre:
+    desc: "创建tag, 打包源码"
+    deps:
+    cmds:
+      - echo "创建tag, 打包源码"
+      - |
+        git add . && git commit -m "release {{.Git_Tag_Next}}" || true
+        git tag -a {{.Git_Tag_Next}} -m ""
+        mkdir -p {{.Archive}}
+        git archive --format=tar.gz --output={{.Archive}}/{{.Git_Tag_Next}}.tar.gz HEAD
+      - echo "版本:{{.Git_Tag_Next}}"
 
   arch:x86_64:
     desc: Build the project for x86_64
@@ -60,3 +81,52 @@ tasks:
         mkdir -p {{.Bin_Dir}}
         go build -ldflags "{{.LDFLAGS}}" -a -installsuffix cgo -o {{.Bin_Dir}}/{{.App_Name}}-{{.Git_Tag_Next}}-{{.ARCH}} ./cmd/app
         upx -9 -q {{.Bin_Dir}}/{{.App_Name}}-{{.Git_Tag_Next}}-{{.ARCH}}
+
+  arch:aarch64:
+    vars:
+      ARCH: "aarch64"
+    cmds:
+      - |
+        echo "构建项目: {{.App_Name}}-{{.Git_Tag_Next}}-{{.ARCH}}"
+        export CGO_ENABLED=0
+        export GOOS=linux
+        export GOARCH=arm64
+
+        mkdir -p {{.Bin_Dir}}
+        go build -ldflags "{{.LDFLAGS}}" -a -installsuffix cgo -o {{.Bin_Dir}}/{{.App_Name}}-{{.Git_Tag_Next}}-{{.ARCH}} ./cmd/app
+        upx -9 -q {{.Bin_Dir}}/{{.App_Name}}-{{.Git_Tag_Next}}-{{.ARCH}}
+
+  arch:armv7:
+    vars:
+      ARCH: "armv7"
+    cmds:
+      - |
+        echo "构建项目: {{.App_Name}}-{{.Git_Tag_Next}}-{{.ARCH}}"
+        export NDK_PATH=/opt/android-sdk/ndk/21.4.7075529
+        export ANDROID_NDK_ROOT=$NDK_PATH
+        export ANDROID_NDK_HOME=$NDK_PATH
+        export TOOLCHAIN=$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64
+        export TARGET=armv7a-linux-androideabi
+        export API=21
+
+        export PATH=$TOOLCHAIN/bin:$PATH
+        export CC=$TOOLCHAIN/bin/$TARGET$API-clang
+        export CXX=$TOOLCHAIN/bin/$TARGET$API-clang++
+
+        export CGO_LDFLAGS="-L$TOOLCHAIN/sysroot/usr/lib/$TARGET/$API"
+        export CGO_CFLAGS="-I$TOOLCHAIN/sysroot/usr/include/$TARGET"
+
+        export CGO_ENABLED=1
+        export GOOS=android
+        export GOARCH=arm
+        export GOARM=7
+
+        mkdir -p {{.Bin_Dir}}
+        go build -ldflags "{{.LDFLAGS}}" -a -installsuffix cgo -o {{.Bin_Dir}}/{{.App_Name}}-{{.Git_Tag_Next}}-{{.ARCH}} ./cmd/app
+        upx -9 -q {{.Bin_Dir}}/{{.App_Name}}-{{.Git_Tag_Next}}-{{.ARCH}}
+
+  rsync:
+    desc: "同步构建结果"
+    cmds:
+      - |
+        rsync -avz {{.Bin_Dir}}/{{.App_Name}}-* rsync://root@1133.s.kuaicdn.cn:11333/root/public/project/{{.Project}}/bin/

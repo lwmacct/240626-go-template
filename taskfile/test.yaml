@@ -1,0 +1,23 @@
+version: "3"
+vars:
+  BIN_DIR: .local/bin
+  DATA_DIR: .local/data
+
+tasks:
+  build:
+    desc: "基础构建"
+    cmds:
+      - echo "构建中..."
+      - go build -o {{.BIN_DIR}}/app ./cmd/app
+
+
+  app:
+    desc: "todo"
+    deps:
+      - task: build
+    cmds:
+      # printRequest
+      - mkdir -p {{.BIN_DIR}}
+      - mkdir -p {{.DATA_DIR}}/repo
+      - |
+        {{.BIN_DIR}}/app app run

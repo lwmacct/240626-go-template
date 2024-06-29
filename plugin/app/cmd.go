@@ -2,6 +2,8 @@
 package app
 
 import (
+	"encoding/json"
+	"fmt"
 	"path"
 	"runtime"
 
@@ -11,6 +13,12 @@ import (
 func getPackageName() string {
 	_, filename, _, _ := runtime.Caller(1)
 	return path.Base(path.Dir(filename))
+}
+func printFlags() {
+	v := &CmdFlags.run
+	if vJson, err := json.MarshalIndent(v, "", "  "); err == nil {
+		fmt.Printf("%s\n", vJson)
+	}
 }
 
 func CmdMenu() *cobra.Command {
@@ -28,7 +36,7 @@ func CmdMenu() *cobra.Command {
 var CmdOptions = make(map[string]*cobra.Command)
 var CmdFlags = struct {
 	run struct {
-		arg string
+		Test string
 	}
 
 	DebugStr string
@@ -41,14 +49,15 @@ func init() {
 		Use:   name,
 		Short: "",
 		Run: func(cmd *cobra.Command, args []string) {
-			main()
+			printFlags()
+			Main(CmdFlags.run.Test)
 		},
 	}
 	co := CmdOptions[name].Flags()
-	co.StringVar(&CmdFlags.run.arg, "arg", "", "测试参数")
+	co.StringVar(&CmdFlags.run.Test, "test", "", "测试参数")
 
 	mft := []string{
-		"arg",
+		"test",
 	}
 	for _, v := range mft {
 		CmdOptions[name].MarkFlagRequired(v)
